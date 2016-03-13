@@ -157,6 +157,19 @@ def query(operation, limit, cur):
             count = ' '*(8 - len(count)) + count
             print(maker[:32] + ' '*(32 - len(maker)) + count)        
 
+        # Events 
+        print('\nEvent' + ' '*28 + 'Count')
+        print('-'*32 + ' ' + '--------')
+        query = 'select event, count(distinct mac+ssid) xCount '
+        query += 'from ssid group by event '
+        query += 'order by xCount desc' + sqlLimit
+ 
+        for row in cur.execute(query):
+            maker = row[0].strip('\r')
+            count = str(row[1])
+            count = ' '*(8 - len(count)) + count
+            print(maker[:32] + ' '*(32 - len(maker)) + count)        
+
         # Average SSIDs 
         print('\nAverage SSIDs per Device')
         print('------------------------')
@@ -167,7 +180,6 @@ def query(operation, limit, cur):
 
         for row in cur.execute(query):
             print(row[0])
-
 
 
 # Process the OUI file
@@ -240,7 +252,7 @@ def get_parser():
 def main():
     parser = get_parser()
     args = vars(parser.parse_args())
-    print(args)
+
     oui = dict()
 
     if args['version']:
