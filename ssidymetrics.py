@@ -131,6 +131,27 @@ def query(operation, limit, cur):
         else:
             sqlLimit = ''
 
+        # Output tallies
+        average = 0
+        unique = 0.00
+
+        # Average SSIDs 
+        query = 'select avg(xcount) xCount '
+        query += 'from (select mac, count(distinct ssid) xcount '
+        query += 'from ssid group by mac) '
+        query += 'order by xCount desc'
+
+        for row in cur.execute(query):
+            average = row[0]
+
+        # Unique MACs 
+        query = 'select count(distinct mac) xCount from ssid'
+
+        for row in cur.execute(query):
+            unique = row[0]
+
+        print('[+] %d unique MAC addresses\n[+] Average SSIDs per MAC = %f' % (unique, average))
+
         # Top SSIDs 
         print('\nTop SSIDs' + ' '*24 + 'Count')
         print('-'*32 + ' ' + '--------')
@@ -157,7 +178,7 @@ def query(operation, limit, cur):
             count = ' '*(8 - len(count)) + count
             print(maker[:32] + ' '*(32 - len(maker)) + count)        
 
-        # Events 
+        # Events
         print('\nEvent' + ' '*28 + 'Count')
         print('-'*32 + ' ' + '--------')
         query = 'select event, count(distinct mac+ssid) xCount '
@@ -169,18 +190,6 @@ def query(operation, limit, cur):
             count = str(row[1])
             count = ' '*(8 - len(count)) + count
             print(maker[:32] + ' '*(32 - len(maker)) + count)        
-
-        # Average SSIDs 
-        print('\nAverage SSIDs per Device')
-        print('------------------------')
-        query = 'select avg(xcount) xCount '
-        query += 'from (select mac, count(distinct ssid) xcount '
-        query += 'from ssid group by mac) '
-        query += 'order by xCount desc'
-
-        for row in cur.execute(query):
-            print(row[0])
-
 
 # Process the OUI file
 def parse_oui():
