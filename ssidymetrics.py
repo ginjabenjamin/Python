@@ -71,7 +71,7 @@ def parse_pineap(logFilename, cur, oui):
             date, event, mac, ssid = ssid.strip('\r').split(',\t')
         except ValueError:
             if(len(ssid.strip('\n')) > 1):
-                print('BAD RECORD (%d): %s' % (count, ssid))
+                print('[-] BAD RECORD (%d): %s' % (count, ssid))
             continue
     
         # Hash the MAC address so that can identify same sources without publishing
@@ -87,12 +87,51 @@ def parse_pineap(logFilename, cur, oui):
         ssidList.append((macHash, event, ssid.strip('\n'), maker))
     
     # Add SSIDs to table
-    cur.executemany('insert into ssid(mac, event, ssid, maker) values(?,?,?,?)', ssidList)
+    cur.executemany('insert into ssid (mac, event, ssid, maker) values(?,?,?,?)', ssidList)
     print("[+] Read %d records from '%s'" % (cur.rowcount, logFilename))
     db.commit()
     
     logFile.close()
+
+# Convert PineAP log to SsidyMetrics
+def parse_pineap_correlate(logFilename, cur):
+    # print("[+] Parsing PineAP log '%s' for MAC matching" % logFilename)
+    count  = 0
+
+    cur.execute('create table macmatch(mac text, machash text, event text, ssid text)')
     
+    if(not os.path.isfile(logFilename)):
+        print("[-] Log file not found: '%s'" % logFilename)
+        return
+    
+    logFile = open(logFilename, 'r')
+    ssidList = []
+        
+    # Process the PineAP log
+    for ssid in logFile:
+        count += 1
+        
+        try:
+            # No idea why there are returns in our SSIDs...
+            date, event, mac, ssid = ssid.strip('\r').split(',\t')
+        except ValueError:
+            if(len(ssid.strip('\n')) > 1):
+                print('[-] BAD RECORD (%d): %s' % (count, ssid))
+            continue
+    
+        # Hash the MAC address so that can identify same sources without publishing
+        # the actual MAC addresses
+        macHash = hashlib.sha1(mac).hexdigest()
+    
+        ssidList.append((mac, macHash, event, ssid.strip('\n')))
+    
+    # Add SSIDs to table
+    cur.executemany('insert into macMatch (mac, machash, event, ssid) values(?,?,?,?)', ssidList)
+    print("[+] Read %d records from '%s'" % (cur.rowcount, logFilename))
+    db.commit()
+    
+    logFile.close()
+
 # Read existing data file
 def parse_data(dataFilename, cur):
     # print("[+] Reading data from '%s'" % dataFilename)
@@ -125,6 +164,14 @@ def query(operation, limit, cur):
         for record in cur.execute('select distinct * from ssid'):
             count += 1
         print('[+] Data contains %d unique records' % count)
+    elif(operation == 'correlate'):
+        query = 'select m.mac, m.event, m.ssid, m.machash '
+        query += 'from macmatch as m inner join ssid s '
+        query += 'on m.machash = s.mac'
+
+        for row in cur.execute(query):
+            print('%s\t%s\t%s (%s)' % (row[0], row[3], row[1], row[2]))
+
     elif(operation == 'metric'):
         if(limit > 0):
             sqlLimit = (' limit %d' % limit)
@@ -253,6 +300,9 @@ def get_parser():
     parser.add_argument('-d', '--data', 
         type=str, 
         help='Use existing data file')
+    parser.add_argument('-c', '--correlate', 
+        type=str, 
+        help='Check log against data file for matching MACs')
     parser.add_argument('-v', '--version',
         help='Displays the current version of SsidyMetrics',
         action='store_true')
@@ -274,13 +324,14 @@ def main():
         # No data specified, use default
         dataFilename = 'ssidymetrics.tab'
 
-    if(args['metrics'] is not None or args['pineaplog']):
+    # If we will use a data file, read it in
+    if(args['metrics'] is not None or args['pineaplog'] or args['correlate']):
         cur = init_database();
 
         # If we are processing data, check for existing data
         parse_data(dataFilename, cur)
             
-    if args['pineaplog']:
+    if(args['pineaplog']):
         # Parsing MACs, so check for OUI
         if args['oui']:
             # Output hex OUI's to a dictionary for lookup
@@ -296,10 +347,14 @@ def main():
         else:
             query('count', 0, cur)
 
-    if args['metrics'] is not None:
+    if(args['metrics'] is not None):
         query('metric', args['metrics'], cur)
         
-    if(not args['metrics'] and not args['pineaplog'] and not args['data']):
+    if(args['correlate']):
+        parse_pineap_correlate(args['correlate'], cur)
+        query('correlate', 0, cur)
+        
+    if(not args['metrics'] and not args['pineaplog'] and not args['data'] and not args['correlate']):
         print('[+] No action specified. Displaying help')
         parser.print_help()
 
