@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 '''
-Reads PineAP log file and outputs tab-delimited file 
-and optionally displays metrics
+Reads PineAP log file and outputs tab-delimited data file 
+and optionally displays metrics and an aggregated report
 '''
 __author__ = "Benjamin"
 __copyright__ = "Copyright 2016, Hivemind"
@@ -163,7 +163,7 @@ def query(operation, limit, cur):
         count = 0
         for record in cur.execute('select distinct * from ssid'):
             count += 1
-        print('[+] Data contains %d unique records' % count)
+        print('[+] Data concdtains %d unique records' % count)
     elif(operation == 'correlate'):
         query = 'select m.mac, m.event, m.ssid, m.machash '
         query += 'from macmatch as m inner join ssid s '
@@ -238,6 +238,25 @@ def query(operation, limit, cur):
             count = ' '*(8 - len(count)) + count
             print(maker[:32] + ' '*(32 - len(maker)) + count)        
 
+    # SSIDs by Events 
+    elif(operation == 'report'):
+        total = 0
+        print('\nEvent' + ' '*10 + 'SSID' + ' '*28 + 'Count')
+        print('-'*14 + ' ' + '-'*32 + ' ' + '-'*8)
+        query = 'select event, ssid, count(distinct mac) xCount '
+        query += 'from ssid '
+        query += 'group by event, ssid '
+        query += 'order by event, xCount desc'
+ 
+        for row in cur.execute(query):
+            total += row[2]
+            count = str(row[2])
+            count = ' '*(8 - len(count)) + count
+            print(row[0] + ' '*(15 - len(row[0])) + row[1] + ' '*(33 - len(row[1])) + count)
+        
+        print(' '*48 + '========')
+        print(' '*(56-len(str(total))) + str(total))        
+
 # Process the OUI file
 def parse_oui():
     manufacturer = dict()
@@ -303,6 +322,9 @@ def get_parser():
     parser.add_argument('-c', '--correlate', 
         type=str, 
         help='Check log against data file for matching MACs')
+    parser.add_argument('-r', '--report',
+        help='Display Events by SSID and client count',
+        action='store_true')
     parser.add_argument('-v', '--version',
         help='Displays the current version of SsidyMetrics',
         action='store_true')
@@ -325,7 +347,11 @@ def main():
         dataFilename = 'ssidymetrics.tab'
 
     # If we will use a data file, read it in
-    if(args['metrics'] is not None or args['pineaplog'] or args['correlate']):
+    if(args['metrics'] is not None 
+       or args['pineaplog'] 
+       or args['correlate']
+       or args['report'] == True
+    ):
         cur = init_database();
 
         # If we are processing data, check for existing data
@@ -349,12 +375,20 @@ def main():
 
     if(args['metrics'] is not None):
         query('metric', args['metrics'], cur)
+    
+    if(args['report'] == True):
+        query('report', None, cur)
         
     if(args['correlate']):
         parse_pineap_correlate(args['correlate'], cur)
         query('correlate', 0, cur)
         
-    if(not args['metrics'] and not args['pineaplog'] and not args['data'] and not args['correlate']):
+    if(not args['metrics'] 
+       and not args['pineaplog'] 
+       and not args['data'] 
+       and not args['correlate']
+       and args['report'] == False
+    ):
         print('[+] No action specified. Displaying help')
         parser.print_help()
 
