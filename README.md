@@ -24,16 +24,16 @@ pineaplog             PineAP log file(s)
 optional arguments:
   -h, --help            show this help message and exit
   
-  -m [METRICS], --metrics [METRICS]
+  -m [METRICS], --metrics [METRICS: number of occurrences]
                         Show metrics; limit results to specified value (Zero for all)
                         
   -o, --oui             Do not perform device manufacturer lookup (Default: False)
   
   -t, --test            Parse but do not save data file (Default: False)
   
-  -d DATA, --data DATA  Use existing data file
+  -d [DATA], --data [DATA file]  Use existing data file
   
-  -c CORRELATE, --correlate CORRELATE
+  -c [CORRELATE], --correlate [CORRELATE log file]
                         Check log against data file for matching MACs
                         
   -r, --report          Display Events by SSID and client count
