@@ -24,7 +24,7 @@ pineaplog             PineAP log file(s)
 optional arguments:
   -h, --help            show this help message and exit
   
-  -m [METRICS], --metrics [METRICS: number of occurrences]
+  -m [METRICS], --metrics [METRICS]
                         Show metrics; limit results to specified value (Zero for all)
                         
   -o, --oui             Do not perform device manufacturer lookup (Default: False)
